@@ -67,7 +67,8 @@ from nnunetv2.utilities.get_network_from_plans import get_network_from_plans
 from nnunetv2.utilities.helpers import empty_cache, dummy_context
 from nnunetv2.utilities.label_handling.label_handling import convert_labelmap_to_one_hot, determine_num_input_channels
 from nnunetv2.utilities.plans_handling.plans_handler import PlansManager
-
+from juliacall import Main as jl
+jl.seval("import CUDA")
 
 class nnUNetTrainer(object):
     def __init__(self, plans: dict, configuration: str, fold: int, dataset_json: dict, unpack_dataset: bool = True,
@@ -149,7 +150,7 @@ class nnUNetTrainer(object):
         self.oversample_foreground_percent = 0.33
         self.num_iterations_per_epoch = 250
         self.num_val_iterations_per_epoch = 50
-        self.num_epochs = 1000
+        self.num_epochs = 500
         self.current_epoch = 0
         self.enable_deep_supervision = True
 
@@ -1005,6 +1006,7 @@ class nnUNetTrainer(object):
             l.backward()
             torch.nn.utils.clip_grad_norm_(self.network.parameters(), 12)
             self.optimizer.step()
+        jl.seval("CUDA.GC.gc(true); CUDA.reclaim()")
         return {'loss': l.detach().cpu().numpy()}
 
     def on_train_epoch_end(self, train_outputs: List[dict]):
@@ -1040,6 +1042,7 @@ class nnUNetTrainer(object):
             output = self.network(data)
             del data
             l = self.loss(output, target)
+            jl.seval("CUDA.GC.gc(true); CUDA.reclaim()")
 
         # we only need the output with the highest output resolution (if DS enabled)
         if self.enable_deep_supervision:
@@ -1376,7 +1379,6 @@ class nnUNetTrainer(object):
                 for batch_id in range(self.num_val_iterations_per_epoch):
                     val_outputs.append(self.validation_step(next(self.dataloader_val)))
                 self.on_validation_epoch_end(val_outputs)
-
             self.on_epoch_end()
 
         self.on_train_end()
