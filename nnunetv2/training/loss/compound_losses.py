@@ -1,4 +1,5 @@
 import torch
+from nnunetv2.training.loss.HD_loss import HD_loss
 from nnunetv2.training.loss.dice import SoftDiceLoss, MemoryEfficientSoftDiceLoss
 from nnunetv2.training.loss.robust_ce_loss import RobustCrossEntropyLoss, TopKLoss
 from nnunetv2.utilities.helpers import softmax_helper_dim1
@@ -7,7 +8,7 @@ from torch import nn
 
 class DC_and_CE_loss(nn.Module):
     def __init__(self, soft_dice_kwargs, ce_kwargs, weight_ce=1, weight_dice=1, ignore_label=None,
-                 dice_class=SoftDiceLoss):
+                 dice_class=SoftDiceLoss, hd = True):
         """
         Weights for CE and Dice do not need to sum to one. You can set whatever you want.
         :param soft_dice_kwargs:
@@ -27,6 +28,12 @@ class DC_and_CE_loss(nn.Module):
 
         self.ce = RobustCrossEntropyLoss(**ce_kwargs)
         self.dc = dice_class(apply_nonlin=softmax_helper_dim1, **soft_dice_kwargs)
+        if hd:
+            self.hd = HD_loss(apply_nonlin=softmax_helper_dim1, power = 4)
+            print("---------------------------------------------------------HD_loss gpu is applied-----------------------------------------------------------------")
+        else:
+            self.hd = None
+
 
     def forward(self, net_output: torch.Tensor, target: torch.Tensor):
         """
@@ -53,6 +60,10 @@ class DC_and_CE_loss(nn.Module):
             if self.weight_ce != 0 and (self.ignore_label is None or num_fg > 0) else 0
 
         result = self.weight_ce * ce_loss + self.weight_dice * dc_loss
+        if self.hd is not None:
+            hd_loss = self.hd(net_output, target[:, 0])
+            if hd_loss and hd_loss < 10:
+                return result + hd_loss
         return result
 
 
