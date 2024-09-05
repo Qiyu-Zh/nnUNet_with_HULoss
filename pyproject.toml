@@ -51,7 +51,8 @@ dependencies = [
     "imagecodecs",
     "yacs",
     "batchgeneratorsv2",
-    "einops"
+    "einops",
+    "py_distance_transforms"
 ]
 
 [project.urls]
