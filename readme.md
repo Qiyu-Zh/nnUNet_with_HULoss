@@ -1,4 +1,5 @@
 # Welcome to the new nnU-Net!
+This package provide gpu version Hausdoff Loss for nnUNet.
 
 Click [here](https://github.com/MIC-DKFZ/nnUNet/tree/nnunetv1) if you were looking for the old one instead.
 
