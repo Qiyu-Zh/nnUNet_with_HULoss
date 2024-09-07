@@ -32,6 +32,8 @@ def find_free_network_port() -> int:
 def get_trainer_from_args(dataset_name_or_id: Union[int, str],
                           configuration: str,
                           fold: int,
+                          num_epochs: int = 1000,
+                          Hausdoff: bool = False,
                           trainer_name: str = 'nnUNetTrainer',
                           plans_identifier: str = 'nnUNetPlans',
                           use_compressed: bool = False,
@@ -63,7 +65,7 @@ def get_trainer_from_args(dataset_name_or_id: Union[int, str],
     plans_file = join(preprocessed_dataset_folder_base, plans_identifier + '.json')
     plans = load_json(plans_file)
     dataset_json = load_json(join(preprocessed_dataset_folder_base, 'dataset.json'))
-    nnunet_trainer = nnunet_trainer(plans=plans, configuration=configuration, fold=fold,
+    nnunet_trainer = nnunet_trainer(plans=plans, configuration=configuration, fold=fold, num_epochs = num_epochs, Hausdoff = Hausdoff,
                                     dataset_json=dataset_json, unpack_dataset=not use_compressed, device=device)
     return nnunet_trainer
 
@@ -137,7 +139,9 @@ def run_ddp(rank, dataset_name_or_id, configuration, fold, tr, p, use_compressed
 
 
 def run_training(dataset_name_or_id: Union[str, int],
-                 configuration: str, fold: Union[int, str],
+                 configuration: str, fold: Union[int, str], 
+                 num_epochs: int = 1000, 
+                 Hausdoff: bool = False,
                  trainer_class_name: str = 'nnUNetTrainer',
                  plans_identifier: str = 'nnUNetPlans',
                  pretrained_weights: Optional[str] = None,
@@ -180,6 +184,8 @@ def run_training(dataset_name_or_id: Union[str, int],
                      dataset_name_or_id,
                      configuration,
                      fold,
+                     num_epochs,
+                     Hausdoff,
                      trainer_class_name,
                      plans_identifier,
                      use_compressed_data,
@@ -193,7 +199,7 @@ def run_training(dataset_name_or_id: Union[str, int],
                  nprocs=num_gpus,
                  join=True)
     else:
-        nnunet_trainer = get_trainer_from_args(dataset_name_or_id, configuration, fold, trainer_class_name,
+        nnunet_trainer = get_trainer_from_args(dataset_name_or_id, configuration, fold, num_epochs, Hausdoff, trainer_class_name,
                                                plans_identifier, use_compressed_data, device=device)
 
         if disable_checkpointing:
@@ -224,6 +230,10 @@ def run_training_entry():
                         help="Configuration that should be trained")
     parser.add_argument('fold', type=str,
                         help='Fold of the 5-fold cross-validation. Should be an int between 0 and 4.')
+    parser.add_argument('--num_epochs', type=int, required=False, default=1000,
+                        help='[OPTIONAL] Number of epochs for the model')
+    parser.add_argument('--Hausdoff', type=bool, required=False, default=False,
+                        help='[OPTIONAL] If you need to use Hausdoff Loss in gpu')
     parser.add_argument('-tr', type=str, required=False, default='nnUNetTrainer',
                         help='[OPTIONAL] Use this flag to specify a custom trainer. Default: nnUNetTrainer')
     parser.add_argument('-p', type=str, required=False, default='nnUNetPlans',
@@ -272,9 +282,9 @@ def run_training_entry():
     else:
         device = torch.device('mps')
 
-    run_training(args.dataset_name_or_id, args.configuration, args.fold, args.tr, args.p, args.pretrained_weights,
-                 args.num_gpus, args.use_compressed, args.npz, args.c, args.val, args.disable_checkpointing, args.val_best,
-                 device=device)
+    run_training(args.dataset_name_or_id, args.configuration, args.fold, args.num_epochs, args.Hausdoff, args.tr, 
+    		 args.p, args.pretrained_weights,args.num_gpus, args.use_compressed, args.npz, args.c, args.val, 
+    		 args.disable_checkpointing, args.val_best, device=device)
 
 
 if __name__ == '__main__':
