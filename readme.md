@@ -1,6 +1,18 @@
 # Welcome to the new nnU-Net!
 This package provide gpu version Hausdoff Loss for nnUNet.
 
+Also, you can define your own number of epochs instead of 1000 originally!
+
+Example without Hausdoff:
+```
+os.system(f"nnUNetv2_train 0{id} 3d_fullres 0 -p nnUNetResEncUNetLPlans --num_epochs 300")
+```
+
+Example with Hausdoff:
+```
+os.system(f"nnUNetv2_train 0{id} 3d_fullres 0 -p nnUNetResEncUNetLPlans --num_epochs 300 --Hausdoff True")
+```
+
 Click [here](https://github.com/MIC-DKFZ/nnUNet/tree/nnunetv1) if you were looking for the old one instead.
 
 Coming from V1? Check out the [TLDR Migration Guide](documentation/tldr_migration_guide_from_v1.md). Reading the rest of the documentation is still strongly recommended ;-)
