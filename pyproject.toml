@@ -52,7 +52,8 @@ dependencies = [
     "yacs",
     "batchgeneratorsv2",
     "einops",
-    "py_distance_transforms"
+    "py_distance_transforms",
+    "juliacall"
 ]
 
 [project.urls]
