@@ -1003,9 +1003,9 @@ class nnUNetTrainer(object):
                 steepness = 10
 
                 hd_wight = start_weight + (max_weight - start_weight) / (1 + np.exp(-steepness * (alpha - 0.5)))
-                self.loss.weight_ce = 1 - alpha
-                self.loss.weight_dice = 1 - alpha
-                self.loss.weight_hd = alpha
+                self.loss.weight_ce = 1 - hd_wight
+                self.loss.weight_dice = 1 - hd_wight
+                self.loss.weight_hd = hd_wight
             l = self.loss(output, target)
 
         if self.grad_scaler is not None:
