@@ -30,6 +30,7 @@ class DC_and_CE_loss(nn.Module):
         self.ce = RobustCrossEntropyLoss(**ce_kwargs)
         self.dc = dice_class(apply_nonlin=softmax_helper_dim1, **soft_dice_kwargs)
         if hd:
+            print("------------------------------HD loss is applied--------------------------------------")
             self.hd = HD_loss(apply_nonlin=softmax_helper_dim1, alpha = 2)
         else:
             self.hd = None
