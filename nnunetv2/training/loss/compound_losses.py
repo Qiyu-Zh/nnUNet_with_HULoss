@@ -7,7 +7,7 @@ from torch import nn
 
 
 class DC_and_CE_loss(nn.Module):
-    def __init__(self, soft_dice_kwargs, ce_kwargs, weight_ce=1, weight_dice=1, ignore_label=None,
+    def __init__(self, soft_dice_kwargs, ce_kwargs, weight_ce=1, weight_dice=1, weight_hd = 1, ignore_label=None,
                  dice_class=SoftDiceLoss, hd = True):
         """
         Weights for CE and Dice do not need to sum to one. You can set whatever you want.
@@ -24,12 +24,13 @@ class DC_and_CE_loss(nn.Module):
 
         self.weight_dice = weight_dice
         self.weight_ce = weight_ce
+        self.weight_hd = weight_hd
         self.ignore_label = ignore_label
 
         self.ce = RobustCrossEntropyLoss(**ce_kwargs)
         self.dc = dice_class(apply_nonlin=softmax_helper_dim1, **soft_dice_kwargs)
         if hd:
-            self.hd = HD_loss(apply_nonlin=softmax_helper_dim1, power = 4)
+            self.hd = HD_loss(apply_nonlin=softmax_helper_dim1, power = 2)
             print("---------------------------------------------------------HD_loss gpu is applied-----------------------------------------------------------------")
         else:
             self.hd = None
@@ -61,9 +62,10 @@ class DC_and_CE_loss(nn.Module):
 
         result = self.weight_ce * ce_loss + self.weight_dice * dc_loss
         if self.hd is not None:
+            print(self.weight_hd)
             hd_loss = self.hd(net_output, target[:, 0])
-            if hd_loss and hd_loss < 10:
-                return result + hd_loss
+            if hd_loss and hd_loss < 1000:
+                return result + self.weight_hd * hd_loss
         return result
 
 
