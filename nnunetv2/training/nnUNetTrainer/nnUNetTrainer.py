@@ -979,7 +979,7 @@ class nnUNetTrainer(object):
         # lrs are the same for all workers so we don't need to gather them in case of DDP training
         self.logger.log('lrs', self.optimizer.param_groups[0]['lr'], self.current_epoch)
 
-    def train_step(self, batch: dict, alpha) -> dict:
+    def train_step(self, batch: dict) -> dict:
         data = batch['data']
         target = batch['target']
 
@@ -997,15 +997,7 @@ class nnUNetTrainer(object):
         with autocast(self.device.type, enabled=True) if self.device.type == 'cuda' else dummy_context():
             output = self.network(data)
             # del data
-            if self.Hausdoff:
-                start_weight = 0
-                max_weight = 0.6
-                steepness = 10
 
-                hd_wight = start_weight + (max_weight - start_weight) / (1 + np.exp(-steepness * (alpha - 0.5)))
-                self.loss.weight_ce = 1 - hd_wight
-                self.loss.weight_dice = 1 - hd_wight
-                self.loss.weight_hd = hd_wight
             l = self.loss(output, target)
 
         if self.grad_scaler is not None:
@@ -1375,14 +1367,21 @@ class nnUNetTrainer(object):
 
     def run_training(self):
         self.on_train_start()
-
+        start_weight = 0
+        max_weight = 0.6
+        steepness = 10
         for epoch in range(self.current_epoch, self.num_epochs):
             self.on_epoch_start()
 
             self.on_train_epoch_start()
             train_outputs = []
+            if self.Hausdoff:
+                hd_wight = start_weight + (max_weight - start_weight) / (1 + np.exp(-steepness * ((1 + epoch)/self.num_epochs - 0.5)))
+                self.loss.weight_ce = 1 - hd_wight
+                self.loss.weight_dice = 1 - hd_wight
+                self.loss.weight_hd = hd_wight
             for batch_id in range(self.num_iterations_per_epoch):
-                train_outputs.append(self.train_step(next(self.dataloader_train), epoch/self.num_epochs))
+                train_outputs.append(self.train_step(next(self.dataloader_train)))
             self.on_train_epoch_end(train_outputs)
 
             with torch.no_grad():
