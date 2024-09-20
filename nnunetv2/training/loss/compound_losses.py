@@ -31,7 +31,6 @@ class DC_and_CE_loss(nn.Module):
         self.dc = dice_class(apply_nonlin=softmax_helper_dim1, **soft_dice_kwargs)
         if hd:
             self.hd = HD_loss(apply_nonlin=softmax_helper_dim1, alpha = 2)
-            print("---------------------------------------------------------HD_loss gpu is applied-----------------------------------------------------------------")
         else:
             self.hd = None
 
