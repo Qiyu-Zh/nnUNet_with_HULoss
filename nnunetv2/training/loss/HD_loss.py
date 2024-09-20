@@ -38,7 +38,7 @@ class HD_loss(nn.Module):
         if self.apply_nonlin is not None:
             pred = self.apply_nonlin(pred)
         target = torch.nn.functional.one_hot(target.long(), pred.shape[1]).permute(0, 4, 1, 2, 3)[:,1:]    
-        pred_dt = self.distance_field(torch.nn.functional.one_hot(torch.argmax(pred, dim=1).long(), pred.shape[1]).permute(0, 4, 1, 2, 3))
+        pred_dt = self.distance_field(torch.nn.functional.one_hot(torch.argmax(pred, dim=1).long(), pred.shape[1]).permute(0, 4, 1, 2, 3)[:,1:])
         pred = pred[:,1:]
         target_dt = self.distance_field(target)
 
@@ -52,8 +52,8 @@ class HD_loss(nn.Module):
 if __name__ == '__main__':
     torch.manual_seed(42)
     from nnunetv2.utilities.helpers import softmax_helper_dim1
-    pred = torch.rand((2, 2, 32, 32, 32))
-    ref = torch.randint(0, 1, (2, 32, 32, 32))
+    pred = torch.rand((2, 10, 32, 32, 32))
+    ref = torch.randint(0, 9, (2, 32, 32, 32))
 
     dl_old = HD_loss(apply_nonlin=softmax_helper_dim1, alpha = 2)
     res_old = dl_old(pred, ref)
