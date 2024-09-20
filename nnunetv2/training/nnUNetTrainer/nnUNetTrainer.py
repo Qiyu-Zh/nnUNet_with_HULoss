@@ -223,7 +223,7 @@ class nnUNetTrainer(object):
             if self._do_i_compile():
                 self.print_to_log_file('Using torch.compile...')
                 self.network = torch.compile(self.network)
-
+            self.loss = self._build_loss()
             self.optimizer, self.lr_scheduler = self.configure_optimizers()
             # if ddp, wrap in DDP wrapper
             if self.is_ddp:
@@ -389,12 +389,8 @@ class nnUNetTrainer(object):
             self.batch_size = batch_size_per_GPU[my_rank]
             self.oversample_foreground_percent = oversample_percent
 
-    def _build_loss(self, alpha):
-        start_weight = 0
-        max_weight = 0.5
-        factor = (np.exp(alpha * 3) - 1) / (np.exp(3) - 1)
-        hd_wight = start_weight + (max_weight - start_weight) * factor
-
+    def _build_loss(self):
+        
         if self.label_manager.has_regions:
             loss = DC_and_BCE_loss({},
                                    {'batch_dice': self.configuration_manager.batch_dice,
@@ -403,7 +399,7 @@ class nnUNetTrainer(object):
                                    dice_class=MemoryEfficientSoftDiceLoss)
         else:
             loss = DC_and_CE_loss({'batch_dice': self.configuration_manager.batch_dice,
-                                   'smooth': 1e-5, 'do_bg': False, 'ddp': self.is_ddp}, {}, weight_ce=1 - hd_wight, weight_dice=1 - hd_wight, weight_hd = hd_wight,
+                                   'smooth': 1e-5, 'do_bg': False, 'ddp': self.is_ddp}, {}, weight_ce=1, weight_dice=1, weight_hd = 1,
                                   ignore_label=self.label_manager.ignore_label, dice_class=MemoryEfficientSoftDiceLoss, hd = self.Hausdoff)
 
         if self._do_i_compile():
@@ -1001,7 +997,15 @@ class nnUNetTrainer(object):
         with autocast(self.device.type, enabled=True) if self.device.type == 'cuda' else dummy_context():
             output = self.network(data)
             # del data
-            self.loss = self._build_loss(alpha)
+            if self.Hausdoff:
+                start_weight = 0
+                max_weight = 0.6
+                steepness = 10
+
+                hd_wight = start_weight + (max_weight - start_weight) / (1 + np.exp(-steepness * (alpha - 0.5)))
+                self.loss.weight_ce = 1 - alpha
+                self.loss.weight_dice = 1 - alpha
+                self.loss.weight_hd = alpha
             l = self.loss(output, target)
 
         if self.grad_scaler is not None:
