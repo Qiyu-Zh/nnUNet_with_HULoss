@@ -394,7 +394,7 @@ class nnUNetTrainer(object):
         max_weight = 0.5
         factor = (np.exp(alpha * 3) - 1) / (np.exp(3) - 1)
         hd_wight = start_weight + (max_weight - start_weight) * factor
-        print(alpha, hd_wight)
+
         if self.label_manager.has_regions:
             loss = DC_and_BCE_loss({},
                                    {'batch_dice': self.configuration_manager.batch_dice,
