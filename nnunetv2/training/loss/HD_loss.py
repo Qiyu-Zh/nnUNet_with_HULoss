@@ -4,66 +4,58 @@ import torch
 from typing import Callable
 from torch import nn
 
-
-def compute_dtm_gpu(img_gt, out_shape):
-    """
-    compute the distance transform map of foreground in binary mask
-    input: segmentation, shape = (batch_size, x, y, z)
-    output: the foreground Distance Map (SDM)
-    dtm(x) = 0; x in segmentation boundary
-             inf|x-y|; x in segmentation
-    """
-
-    # Convert img_gt to float if not already float
-    if img_gt.dtype != torch.float32:
-        img_gt = img_gt.float()
-
-    fg_dtm = torch.zeros(out_shape, dtype=torch.float32, device=img_gt.device)
-
-    for b in range(out_shape[0]):  # batch size
-        for c in range(1, out_shape[1]):
-            posmask = img_gt[b, c]
-            if posmask.bool().any():
-                posdis = transform_cuda(posmask)
-                fg_dtm[b, c] = posdis
-
-    return fg_dtm.to(img_gt.dtype)  
-
-
 class HD_loss(nn.Module):
-    def __init__(self, apply_nonlin: Callable = None, power = 2):
+    """Binary Hausdorff loss based on distance transform"""
+
+    def __init__(self, apply_nonlin: Callable = None, alpha=2.0):
         super(HD_loss, self).__init__()
-        self.power = power
+        self.alpha = alpha
         self.apply_nonlin = apply_nonlin
 
-    def forward(self, x, y):
+    @torch.no_grad()
+    def distance_field(self, img):
+
+        field = torch.zeros_like(img, dtype=torch.float32, device=img.device)
+        out_shape = field.shape
+        for batch in range(out_shape[0]):
+            for c in range(out_shape[1]):
+                fg_mask = img[batch, c] 
+                if fg_mask.any():
+                    bg_mask = ~fg_mask
+
+                    fg_dist = transform_cuda(fg_mask)
+                    bg_dist = transform_cuda(bg_mask)
+
+                    field[batch, c] = fg_dist + bg_dist
+        return field
+
+    def forward(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        """
+        Uses one binary channel: 1 - fg, 0 - bg
+        pred: (b, 1, x, y, z) or (b, 1, x, y)
+        target: (b, 1, x, y, z) or (b, 1, x, y)
+        """
         if self.apply_nonlin is not None:
-            x = self.apply_nonlin(x)
-        num_classes = x.shape[1]
-        if len(x.shape) == 5:
-            y = torch.nn.functional.one_hot(y.long(), num_classes).permute(0, 4, 1, 2, 3)
-            delta_s = (x - y.float()) ** self.power
-            x = torch.nn.functional.one_hot(torch.argmax(x, dim=1).long(), num_classes).permute(0, 4, 1, 2, 3)
-        else:
-            y = torch.nn.functional.one_hot(y.long(), num_classes).permute(0, 3, 1, 2)
-            delta_s = (x - y.float()) ** self.power
-            x = torch.nn.functional.one_hot(torch.argmax(x, dim=1).long(), num_classes).permute(0, 3, 1, 2)
-        gt_dtm = compute_dtm_gpu(y, x.shape) ** self.power
-        # print(gt_dtm.shape)
-        
-        seg_dtm = compute_dtm_gpu(x, x.shape) ** self.power
-        dtm = gt_dtm + seg_dtm
+            pred = self.apply_nonlin(pred)
+        target = torch.nn.functional.one_hot(target.long(), pred.shape[1]).permute(0, 4, 1, 2, 3)[:,1:]    
+        pred_dt = self.distance_field(torch.nn.functional.one_hot(torch.argmax(pred, dim=1).long(), pred.shape[1]).permute(0, 4, 1, 2, 3))
+        pred = pred[:,1:]
+        target_dt = self.distance_field(target)
 
-        multipled = torch.einsum('bcxyz, bcxyz->bcxyz', delta_s, dtm)
-        return multipled[:,1:].mean()
-   
+        pred_error = (pred - target) ** 2
+        distance = pred_dt ** self.alpha + target_dt ** self.alpha
 
+        dt_field = pred_error * distance
+        loss = dt_field.mean()
+        return loss
 
 if __name__ == '__main__':
+    torch.manual_seed(42)
     from nnunetv2.utilities.helpers import softmax_helper_dim1
-    pred = torch.rand((2, 10, 32, 32, 32))
-    ref = torch.randint(0, 9, (2, 32, 32, 32))
+    pred = torch.rand((2, 2, 32, 32, 32))
+    ref = torch.randint(0, 1, (2, 32, 32, 32))
 
-    dl_old = HD_loss(apply_nonlin=softmax_helper_dim1, power = 4)
+    dl_old = HD_loss(apply_nonlin=softmax_helper_dim1, alpha = 2)
     res_old = dl_old(pred, ref)
     print(res_old)
+
