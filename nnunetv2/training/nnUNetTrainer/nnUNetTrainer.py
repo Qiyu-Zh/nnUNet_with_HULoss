@@ -230,7 +230,6 @@ class nnUNetTrainer(object):
                 self.network = torch.nn.SyncBatchNorm.convert_sync_batchnorm(self.network)
                 self.network = DDP(self.network, device_ids=[self.local_rank])
 
-            self.loss = self._build_loss()
             # torch 2.2.2 crashes upon compiling CE loss
             # if self._do_i_compile():
             #     self.loss = torch.compile(self.loss)
@@ -390,7 +389,12 @@ class nnUNetTrainer(object):
             self.batch_size = batch_size_per_GPU[my_rank]
             self.oversample_foreground_percent = oversample_percent
 
-    def _build_loss(self):
+    def _build_loss(self, alpha):
+        start_weight = 0
+        max_weight = 0.5
+        factor = (np.exp(alpha * 3) - 1) / (np.exp(3) - 1)
+        hd_wight = start_weight + (max_weight - start_weight) * factor
+        print(alpha, hd_wight)
         if self.label_manager.has_regions:
             loss = DC_and_BCE_loss({},
                                    {'batch_dice': self.configuration_manager.batch_dice,
@@ -399,7 +403,7 @@ class nnUNetTrainer(object):
                                    dice_class=MemoryEfficientSoftDiceLoss)
         else:
             loss = DC_and_CE_loss({'batch_dice': self.configuration_manager.batch_dice,
-                                   'smooth': 1e-5, 'do_bg': False, 'ddp': self.is_ddp}, {}, weight_ce=1, weight_dice=1,
+                                   'smooth': 1e-5, 'do_bg': False, 'ddp': self.is_ddp}, {}, weight_ce=1 - hd_wight, weight_dice=1 - hd_wight, weight_hd = hd_wight,
                                   ignore_label=self.label_manager.ignore_label, dice_class=MemoryEfficientSoftDiceLoss, hd = self.Hausdoff)
 
         if self._do_i_compile():
@@ -979,7 +983,7 @@ class nnUNetTrainer(object):
         # lrs are the same for all workers so we don't need to gather them in case of DDP training
         self.logger.log('lrs', self.optimizer.param_groups[0]['lr'], self.current_epoch)
 
-    def train_step(self, batch: dict) -> dict:
+    def train_step(self, batch: dict, alpha) -> dict:
         data = batch['data']
         target = batch['target']
 
@@ -997,6 +1001,7 @@ class nnUNetTrainer(object):
         with autocast(self.device.type, enabled=True) if self.device.type == 'cuda' else dummy_context():
             output = self.network(data)
             # del data
+            self.loss = self._build_loss(alpha)
             l = self.loss(output, target)
 
         if self.grad_scaler is not None:
@@ -1373,7 +1378,7 @@ class nnUNetTrainer(object):
             self.on_train_epoch_start()
             train_outputs = []
             for batch_id in range(self.num_iterations_per_epoch):
-                train_outputs.append(self.train_step(next(self.dataloader_train)))
+                train_outputs.append(self.train_step(next(self.dataloader_train), epoch/self.num_epochs))
             self.on_train_epoch_end(train_outputs)
 
             with torch.no_grad():
