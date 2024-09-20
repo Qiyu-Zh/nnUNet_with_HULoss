@@ -42,13 +42,15 @@ class HD_loss(nn.Module):
         num_classes = x.shape[1]
         if len(x.shape) == 5:
             y = torch.nn.functional.one_hot(y.long(), num_classes).permute(0, 4, 1, 2, 3)
+            delta_s = (x - y.float()) ** self.power
             x = torch.nn.functional.one_hot(torch.argmax(x, dim=1).long(), num_classes).permute(0, 4, 1, 2, 3)
         else:
             y = torch.nn.functional.one_hot(y.long(), num_classes).permute(0, 3, 1, 2)
+            delta_s = (x - y.float()) ** self.power
             x = torch.nn.functional.one_hot(torch.argmax(x, dim=1).long(), num_classes).permute(0, 3, 1, 2)
         gt_dtm = compute_dtm_gpu(y, x.shape) ** self.power
         # print(gt_dtm.shape)
-        delta_s = (x - y.float()) ** self.power
+        
         seg_dtm = compute_dtm_gpu(x, x.shape) ** self.power
         dtm = gt_dtm + seg_dtm
 
