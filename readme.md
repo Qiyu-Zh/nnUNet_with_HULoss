@@ -10,7 +10,7 @@ os.system(f"nnUNetv2_train 0{id} 3d_fullres 0 -p nnUNetResEncUNetLPlans --num_ep
 
 Example with Hausdoff:
 ```
-os.system(f"nnUNetv2_train 0{id} 3d_fullres 0 -p nnUNetResEncUNetLPlans --num_epochs 300 --Hausdoff True")
+os.system(f"nnUNetv2_train 0{id} 3d_fullres 0 -p nnUNetResEncUNetLPlans --num_epochs 300 --Hausdorff True")
 ```
 To install the package:
 ```
