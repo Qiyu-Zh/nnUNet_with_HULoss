@@ -16,7 +16,7 @@ To install the package:
 ```
 pip install git+https://github.com/Qiyu-Zh/nnUNet_with_HULoss.git
 ```
-To use Hausdoff Loss, please install julia version 1.10
+To use Hausdoff Loss, you will automatically install julia version 1.10
 
 
 
