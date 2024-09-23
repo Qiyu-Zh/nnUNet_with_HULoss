@@ -22,10 +22,8 @@ class HD_loss(nn.Module):
                 fg_mask = img[batch, c] 
                 if fg_mask.any():
                     bg_mask = ~fg_mask
-
                     fg_dist = transform_cuda(fg_mask)
                     bg_dist = transform_cuda(bg_mask)
-
                     field[batch, c] = fg_dist + bg_dist
         return field
 
@@ -37,11 +35,11 @@ class HD_loss(nn.Module):
         """
         if self.apply_nonlin is not None:
             pred = self.apply_nonlin(pred)
-        target = torch.nn.functional.one_hot(target.long(), pred.shape[1]).permute(0, 4, 1, 2, 3)[:,1:]    
-        pred_dt = self.distance_field(torch.nn.functional.one_hot(torch.argmax(pred, dim=1).long(), pred.shape[1]).permute(0, 4, 1, 2, 3)[:,1:])
+        with torch.no_grad():
+            target = torch.nn.functional.one_hot(target.long(), pred.shape[1]).permute(0, 4, 1, 2, 3)[:,1:]    
+            pred_dt = self.distance_field(torch.nn.functional.one_hot(torch.argmax(pred, dim=1).long(), pred.shape[1]).permute(0, 4, 1, 2, 3)[:,1:].to(dtype=torch.bool))
+            target_dt = self.distance_field(target.to(dtype=torch.bool))
         pred = pred[:,1:]
-        target_dt = self.distance_field(target)
-
         pred_error = (pred - target) ** 2
         distance = pred_dt ** self.alpha + target_dt ** self.alpha
 
@@ -50,10 +48,10 @@ class HD_loss(nn.Module):
         return loss
 
 if __name__ == '__main__':
-    torch.manual_seed(42)
+    torch.manual_seed(1)
     from nnunetv2.utilities.helpers import softmax_helper_dim1
-    pred = torch.rand((2, 10, 32, 32, 32))
-    ref = torch.randint(0, 9, (2, 32, 32, 32))
+    pred = torch.rand((2, 2, 64, 64, 64))
+    ref = torch.randint(0, 1, (2, 64, 64, 64))
 
     dl_old = HD_loss(apply_nonlin=softmax_helper_dim1, alpha = 2)
     res_old = dl_old(pred, ref)
