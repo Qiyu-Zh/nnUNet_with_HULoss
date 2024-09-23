@@ -39,8 +39,7 @@ class HD_loss(nn.Module):
             target = torch.nn.functional.one_hot(target.long(), pred.shape[1]).permute(0, 4, 1, 2, 3)[:,1:]    
             pred_dt = self.distance_field(torch.nn.functional.one_hot(torch.argmax(pred, dim=1).long(), pred.shape[1]).permute(0, 4, 1, 2, 3)[:,1:].to(dtype=torch.bool))
             target_dt = self.distance_field(target.to(dtype=torch.bool))
-        pred = pred[:,1:]
-        pred_error = (pred - target) ** 2
+        pred_error = (pred[:,1:] - target) ** 2
         distance = pred_dt ** self.alpha + target_dt ** self.alpha
 
         dt_field = pred_error * distance
