@@ -72,7 +72,7 @@ jl.seval("import CUDA")
 
 class nnUNetTrainer(object):
     def __init__(self, plans: dict, configuration: str, fold: int, dataset_json: dict, unpack_dataset: bool = True, num_epochs = 
-    		 1000, Hausdoff = False, device: torch.device = torch.device('cuda')):
+    		 1000, Hausdorff = False, device: torch.device = torch.device('cuda')):
         # From https://grugbrain.dev/. Worth a read ya big brains ;-)
 
         # apex predator of grug is complexity
@@ -151,9 +151,9 @@ class nnUNetTrainer(object):
         self.num_iterations_per_epoch = 250
         self.num_val_iterations_per_epoch = 50
         self.num_epochs = num_epochs
-        self.Hausdoff = Hausdoff
+        self.Hausdorff = Hausdorff
         print(f"The number of epochs is {num_epochs}")
-        print(f"The use of Hausdoff is ", Hausdoff)
+        print(f"The use of Hausdorff is ", Hausdorff)
         self.current_epoch = 0
         self.enable_deep_supervision = True
 
@@ -400,7 +400,7 @@ class nnUNetTrainer(object):
         else:
             loss = DC_and_CE_loss({'batch_dice': self.configuration_manager.batch_dice,
                                    'smooth': 1e-5, 'do_bg': False, 'ddp': self.is_ddp}, {}, weight_ce=1, weight_dice=1, weight_hd = 1,
-                                  ignore_label=self.label_manager.ignore_label, dice_class=MemoryEfficientSoftDiceLoss, hd = self.Hausdoff)
+                                  ignore_label=self.label_manager.ignore_label, dice_class=MemoryEfficientSoftDiceLoss, hd = self.Hausdorff)
 
         if self._do_i_compile():
             loss.dc = torch.compile(loss.dc)
@@ -1375,7 +1375,7 @@ class nnUNetTrainer(object):
 
             self.on_train_epoch_start()
             train_outputs = []
-            if self.Hausdoff:
+            if self.Hausdorff:
                 hd_wight = start_weight + (max_weight - start_weight) / (1 + np.exp(-steepness * ((1 + epoch)/self.num_epochs - 0.5)))
                 self.loss.weight_ce = 1 - hd_wight
                 self.loss.weight_dice = 1 - hd_wight
