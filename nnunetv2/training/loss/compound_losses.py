@@ -64,7 +64,7 @@ class DC_and_CE_loss(nn.Module):
         if self.hd is not None:
             hd_loss = self.hd(net_output, target[:, 0])
             if hd_loss and hd_loss < 100:
-                return result + self.weight_hd * 0.01 * hd_loss
+                return result + self.weight_hd * hd_loss
         return result
 
 
