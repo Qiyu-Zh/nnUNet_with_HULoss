@@ -22,8 +22,8 @@ class HD_loss(nn.Module):
                 fg_mask = img[batch, c] 
                 if fg_mask.any():
                     bg_mask = ~fg_mask
-                    fg_dist = transform_cuda(fg_mask)
-                    bg_dist = transform_cuda(bg_mask)
+                    fg_dist = transform_cuda(fg_mask)**0.5
+                    bg_dist = transform_cuda(bg_mask)**0.5
                     field[batch, c] = fg_dist + bg_dist
         return field
 
