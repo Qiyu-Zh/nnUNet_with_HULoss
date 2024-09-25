@@ -1375,7 +1375,7 @@ class nnUNetTrainer(object):
 
             self.on_train_epoch_start()
             train_outputs = []
-            if self.Hausdorff:
+            if self.Hausdorff and epoch > 0.1*self.num_epochs:
                 hd_wight = start_weight + (max_weight - start_weight) / (1 + np.exp(-steepness * ((1 + epoch)/self.num_epochs - 0.5)))
                 self.loss.weight_ce = 1 - hd_wight
                 self.loss.weight_dice = 1 - hd_wight
