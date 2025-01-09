@@ -72,7 +72,7 @@ jl.seval("import CUDA")
 
 class nnUNetTrainer(object):
     def __init__(self, plans: dict, configuration: str, fold: int, dataset_json: dict, unpack_dataset: bool = True, num_epochs = 
-    		 1000, Hausdoff = False, device: torch.device = torch.device('cuda')):
+    		 1000, Hausdorff = False, device: torch.device = torch.device('cuda')):
         # From https://grugbrain.dev/. Worth a read ya big brains ;-)
 
         # apex predator of grug is complexity
@@ -151,9 +151,9 @@ class nnUNetTrainer(object):
         self.num_iterations_per_epoch = 250
         self.num_val_iterations_per_epoch = 50
         self.num_epochs = num_epochs
-        self.Hausdoff = Hausdoff
+        self.Hausdorff = Hausdorff
         print(f"The number of epochs is {num_epochs}")
-        print(f"The use of Hausdoff is ", Hausdoff)
+        print(f"The use of Hausdorff is ", Hausdorff)
         self.current_epoch = 0
         self.enable_deep_supervision = True
 
@@ -223,14 +223,13 @@ class nnUNetTrainer(object):
             if self._do_i_compile():
                 self.print_to_log_file('Using torch.compile...')
                 self.network = torch.compile(self.network)
-
+            self.loss = self._build_loss()
             self.optimizer, self.lr_scheduler = self.configure_optimizers()
             # if ddp, wrap in DDP wrapper
             if self.is_ddp:
                 self.network = torch.nn.SyncBatchNorm.convert_sync_batchnorm(self.network)
                 self.network = DDP(self.network, device_ids=[self.local_rank])
 
-            self.loss = self._build_loss()
             # torch 2.2.2 crashes upon compiling CE loss
             # if self._do_i_compile():
             #     self.loss = torch.compile(self.loss)
@@ -391,6 +390,7 @@ class nnUNetTrainer(object):
             self.oversample_foreground_percent = oversample_percent
 
     def _build_loss(self):
+        
         if self.label_manager.has_regions:
             loss = DC_and_BCE_loss({},
                                    {'batch_dice': self.configuration_manager.batch_dice,
@@ -399,8 +399,8 @@ class nnUNetTrainer(object):
                                    dice_class=MemoryEfficientSoftDiceLoss)
         else:
             loss = DC_and_CE_loss({'batch_dice': self.configuration_manager.batch_dice,
-                                   'smooth': 1e-5, 'do_bg': False, 'ddp': self.is_ddp}, {}, weight_ce=1, weight_dice=1,
-                                  ignore_label=self.label_manager.ignore_label, dice_class=MemoryEfficientSoftDiceLoss, hd = self.Hausdoff)
+                                   'smooth': 1e-5, 'do_bg': False, 'ddp': self.is_ddp}, {}, weight_ce=1, weight_dice=1, weight_hd = 0,
+                                  ignore_label=self.label_manager.ignore_label, dice_class=MemoryEfficientSoftDiceLoss, hd = self.Hausdorff)
 
         if self._do_i_compile():
             loss.dc = torch.compile(loss.dc)
@@ -997,6 +997,7 @@ class nnUNetTrainer(object):
         with autocast(self.device.type, enabled=True) if self.device.type == 'cuda' else dummy_context():
             output = self.network(data)
             # del data
+
             l = self.loss(output, target)
 
         if self.grad_scaler is not None:
@@ -1366,12 +1367,20 @@ class nnUNetTrainer(object):
 
     def run_training(self):
         self.on_train_start()
-
+        start_weight = 0
+        max_weight = 0.5
+        steepness = 10
         for epoch in range(self.current_epoch, self.num_epochs):
             self.on_epoch_start()
 
             self.on_train_epoch_start()
             train_outputs = []
+            if self.Hausdorff and epoch >= 0.05 * self.num_epochs:
+                hd_wight = start_weight + (max_weight - start_weight) / (1 + np.exp(-steepness * ((1 + epoch)/self.num_epochs - 0.5)))
+                
+                self.loss.weight_dice = 1 - hd_wight
+                self.loss.weight_hd = hd_wight
+                self.loss.weight_ce = 1 - hd_wight
             for batch_id in range(self.num_iterations_per_epoch):
                 train_outputs.append(self.train_step(next(self.dataloader_train)))
             self.on_train_epoch_end(train_outputs)
