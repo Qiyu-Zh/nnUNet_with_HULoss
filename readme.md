@@ -1,22 +1,22 @@
 # nnUNet_with_HULoss
-This package provide gpu version Hausdoff Loss for nnUNet.
+This package provide gpu version Hausdorff Loss for nnUNet.
 
 Also, you can define your own number of epochs instead of 1000 originally!
 
-Example without Hausdoff:
+Example without Hausdorff:
 ```
 os.system(f"nnUNetv2_train 0{id} 3d_fullres 0 -p nnUNetResEncUNetLPlans --num_epochs 300")
 ```
 
 Example with Hausdoff:
 ```
-os.system(f"nnUNetv2_train 0{id} 3d_fullres 0 -p nnUNetResEncUNetLPlans --num_epochs 300 --Hausdoff True")
+os.system(f"nnUNetv2_train 0{id} 3d_fullres 0 -p nnUNetResEncUNetLPlans --num_epochs 300 --Hausdorff True")
 ```
 To install the package:
 ```
 pip install git+https://github.com/Qiyu-Zh/nnUNet_with_HULoss.git
 ```
-To use Hausdoff Loss, please install julia version 1.10
+To use Hausdorff Loss, please install julia version 1.10
 
 
 
