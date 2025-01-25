@@ -8,7 +8,7 @@ Example without Hausdorff:
 os.system(f"nnUNetv2_train 0{id} 3d_fullres 0 -p nnUNetResEncUNetLPlans --num_epochs 300")
 ```
 
-Example with Hausdoff:
+Example with Hausdorff:
 ```
 os.system(f"nnUNetv2_train 0{id} 3d_fullres 0 -p nnUNetResEncUNetLPlans --num_epochs 300 --Hausdorff True")
 ```
